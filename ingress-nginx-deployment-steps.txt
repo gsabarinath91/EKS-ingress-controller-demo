@@ -1,0 +1,58 @@
+# Deploy Nginx Ingress Controller on EKS v1.19
+
+wget https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/aws/deploy.yaml
+mv deploy.yaml ingress-nginx-deploy.yaml
+sed -i .bak '/aws-load-balancer-type: nlb/s/^/#/' ingress-nginx-deploy.yaml   (on mac)
+Kubectl apply -f ingress-nginx-deploy.yaml 
+
+(OR)
+
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.0.0/deploy/static/provider/aws/deploy.yaml    (Deploys the NLB by default)
+
+# Verify the Controller pod & loadbalancer creation
+
+kubectl get pods --namespace=ingress-nginx
+
+kubectl logs ingress-nginx-controller-XXXXXXXX-XXXXXX -n ingress-nginx
+
+kubectl get service -n ingress-nginx
+
+# Create Pod and the Service
+
+kubectl apply -f apple.yaml
+kubectl apply -f banana.yaml
+
+# Deploy Ingress rule and verify
+
+kubectl apply -f fruites-ingress.yaml
+
+kubectl describe ingress -n default
+
+# Verify the Ingress rule is effective (Path based routing)
+
+curl -I http://a5dd3facbc7814e889ce9f5f5bc8282a-802966225.ap-southeast-1.elb.amazonaws.com/
+
+Note: The default server returns a "Not Found" page with a 404 status code for all the requests for domains where no Ingress rules are defined. The Ingress Controller, based on the defined rules, doesn't divert traffic to the specified backend service, unless the request matches with the configuration. Because the host field is configured for the Ingress object, you must supply the Host header of the request with the same hostname.
+
+
+curl -I -H "Host: fruitshop.com" http://a5dd3facbc7814e889ce9f5f5bc8282a-802966225.ap-southeast-1.elb.amazonaws.com/apple
+
+curl -I -H "Host: fruitshop.com" http://a5dd3facbc7814e889ce9f5f5bc8282a-802966225.ap-southeast-1.elb.amazonaws.com/banana
+
+
+# Test Named based routing
+
+kubectl create ns app1
+kubectl apply -f hostname-app.yaml
+kubectl apply -f apache-app.yaml
+kubectl apply -f app1-ingress.yaml
+
+curl -H "Host: apache.mydomain.com" http://a5dd3facbc7814e889ce9f5f5bc8282a-802966225.ap-southeast-1.elb.amazonaws.com
+curl -H "Host: hostname.mydomain.com" http://a5dd3facbc7814e889ce9f5f5bc8282a-802966225.ap-southeast-1.elb.amazonaws.com
+
+k logs -f ingress-nginx-controller-74c47694fd-wpcng  -n ingress-nginx
+
+Reference:
+
+https://kubernetes.github.io/ingress-nginx/deploy/
+https://aws.amazon.com/premiumsupport/knowledge-center/eks-access-kubernetes-services/

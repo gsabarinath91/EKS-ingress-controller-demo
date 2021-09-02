@@ -1,0 +1,54 @@
+aws Load Balancer Controller
+
+
+# Verify the OIDC provider
+
+aws eks describe-cluster --name <cluster_name> --query "cluster.identity.oidc.issuer" --output text
+
+If IAM ODIC provider for the cluster doesn't exist, follow the below document steps
+
+https://docs.aws.amazon.com/eks/latest/userguide/enable-iam-roles-for-service-accounts.html
+
+# Deploy the aws Load Balancer Controller Controller
+
+https://docs.aws.amazon.com/eks/latest/userguide/aws-load-balancer-controller.html
+
+  A) Create the "aws-load-balancer-controller" service account.
+
+  B) Install cert-manager to inject certificate configuration into the webhooks.
+
+kubectl apply --validate=false  -f https://github.com/jetstack/cert-manager/releases/download/v1.1.1/cert-manager.yaml
+
+  C) Install the controller after modify the manifest to match the cluster information.
+
+curl -o v2_2_0_full.yaml https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/v2.2.0/docs/install/v2_2_0_full.yaml
+
+  D) Verify that the controller is installed
+
+  kubectl get deployment -n kube-system aws-load-balancer-controller
+ 
+ # Deploy the sample application
+
+ export EKS_CLUSTER_VERSION=$(aws eks describe-cluster --name <Cluster-NName> --query cluster.version --region <Region> --output text)
+
+if [ "`echo "${EKS_CLUSTER_VERSION} < 1.19" | bc`" -eq 1 ]; then
+    curl -s https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/main/docs/examples/2048/2048_full.yaml \
+    | sed 's=alb.ingress.kubernetes.io/target-type: ip=alb.ingress.kubernetes.io/target-type: instance=g' \
+    | kubectl apply -f -
+fi
+
+if [ "`echo "${EKS_CLUSTER_VERSION} >= 1.19" | bc`" -eq 1 ]; then
+    curl -s https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/main/docs/examples/2048/2048_full_latest.yaml \
+    | sed 's=alb.ingress.kubernetes.io/target-type: ip=alb.ingress.kubernetes.io/target-type: instance=g' \
+    | kubectl apply -f -
+fi
+
+ # Added this annotation for LB subnet (https://kubernetes-sigs.github.io/aws-load-balancer-controller/v2.2/deploy/subnet_discovery/)
+
+ alb.ingress.kubernetes.io/subnets: subnet-98e925c1,subnet-ba0001f3,subnet-e6f9e881
+
+
+
+# Reference 
+https://github.com/kubernetes-sigs/aws-load-balancer-controller
+https://www.eksworkshop.com/beginner/130_exposing-service/ingress_controller_alb/
